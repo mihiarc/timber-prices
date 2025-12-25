@@ -7,7 +7,7 @@ This document tracks known data gaps and potential sources for expanding the uni
 | State | Current Coverage | Gap | Solution | Priority |
 |-------|-----------------|-----|----------|----------|
 | **New Hampshire** | 1985-2011 | 2012-2024 | Manual download from NH DRA | High |
-| **Tennessee** | 2003-2017 | 2018-present | TimberMart-South (paid) | High |
+| **Tennessee** | 2009-2025 | 2018-2022 | State Forest sales fill 2023-2025 | Medium |
 | **Kentucky** | 2024 Q3-Q4 only | Historical (pre-2024), OCR needed | OCR for PDFs, contact state | Medium |
 | **California** | 2019-2025 | 2009-2018 | Contact CDTFA | Medium |
 | **Georgia** | 2024-2025 | Historical | TimberMart-South or UGA | Low |
@@ -56,29 +56,44 @@ The NH Department of Revenue Administration (DRA) publishes semi-annual stumpage
 
 ---
 
-## Tennessee
+## Tennessee (PARTIALLY RESOLVED)
 
 ### Current Status
-- **Coverage**: 2003-2017 (Tennessee Forest Products Bulletin)
-- **Gap**: 2018-present (7 years)
+- **Coverage**: 2009-2025 (605 records)
+- **Gap**: 2018-2022 (5 years)
 
-### Issue
-The Tennessee Forest Products Bulletin **ceased publication in 2017**. This was the official quarterly stumpage price report from the Tennessee Department of Agriculture Division of Forestry.
+### Resolution (2023-2025)
+The Tennessee State Forest Timber Sales Archive provides actual bid data from state forest timber sales, including volumes and winning bid amounts. Stumpage prices were calculated by dividing bid by volume.
 
-### Potential Solutions
+1. **Data Source**: TN State Forest Timber Sale Archive
+   - URL: https://www.tn.gov/agriculture/forests/state-forests/timber-sale-archive.html
+   - Data extracted: FY 2023, 2024, 2025 (49 timber sales)
+
+2. **Parser Created**: `scripts/parse_tn_timber_sales.py`
+   - Extracts sale ID, state forest, volume (BF), winning bid
+   - Calculates price per MBF = bid / (volume / 1000)
+   - Aggregates by year and timber type
+
+3. **Integration**: `scripts/integrate_tn_forestry.py`
+   - Added 8 aggregated records (3 years × ~3 timber types)
+   - Combined with existing 2009-2017 TN Forest Products Bulletin data
+   - Total: 605 TN records
+
+### Data Coverage
+- **Years**: 2009-2025 (with 2018-2022 gap)
+- **Species**: Hardwood (~$544/MBF), Pine (~$217/MBF), Mixed (~$307/MBF)
+- **Product**: Sawtimber (Doyle Rule board feet)
+- **State Forests**: Chuck Swan, Chickasaw, Natchez Trace, Standing Stone, Prentice Cooper, Franklin, Lone Mountain, Pickett, Lewis
+
+### Remaining Gap (2018-2022)
+The Tennessee Forest Products Bulletin **ceased publication in 2017**. For 2018-2022 data:
 
 1. **TimberMart-South (Recommended)**
    - Commercial subscription service
    - Has quarterly data from 1976-present for Tennessee
    - Contact: tmart@timbermart-south.com, 706-247-7660
-   - Cost: Custom quotes based on data needs
 
-2. **Tennessee State Forest Timber Sales Archive**
-   - URL: https://www.tn.gov/agriculture/forests/state-forests/timber-sale-archive.html
-   - Limited to FY 2023-2025, individual sale records
-   - Labor-intensive to aggregate
-
-3. **Contact Tennessee Division of Forestry**
+2. **Contact Tennessee Division of Forestry**
    - David Neumann: David.Neumann@tn.gov, 615-837-5334
    - May have unpublished internal data
 
@@ -280,16 +295,16 @@ USFS PNW updates data annually (typically January). Check for 2023-2024 data at 
 ## Priority Actions
 
 ### High Priority
-1. **Tennessee**: Contact TimberMart-South for 2018-2024 data quote
+1. **New Hampshire**: Manual download of 2021-2025 PDFs from DRA website
 2. **California**: Contact CDTFA for 2009-2018 archived schedules
 
 ### Medium Priority
-3. **Kentucky**: Implement OCR pipeline for image-based PDFs
-4. **Georgia**: Explore UGA Extension PDF parsing
+3. **Tennessee**: Contact TimberMart-South for 2018-2022 data quote (5-year gap)
+4. **Kentucky**: Implement OCR pipeline for image-based PDFs
 
 ### Low Priority
-5. **All states**: Establish contacts with state forestry divisions for historical data
-6. **Research**: Investigate USDA FIA stumpage price surveys
+5. **Georgia**: Explore UGA Extension PDF parsing
+6. **All states**: Establish contacts with state forestry divisions for historical data
 
 ---
 
