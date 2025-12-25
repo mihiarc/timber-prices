@@ -12,6 +12,9 @@ from rich.console import Console
 from rich.table import Table
 from rich.progress import track
 
+# Import conversion factors
+from unit_conversion_factors import convert_to_per_ton, get_cord_to_ton_factor, get_mbf_to_ton_factor
+
 console = Console()
 
 # Base path for raw data
@@ -27,10 +30,12 @@ UNIFIED_COLUMNS = [
     'county',           # County name (GA only)
     'species',          # Species or species group
     'product_type',     # Standardized product type
-    'price_avg',        # Average price
-    'price_low',        # Low price range
-    'price_high',       # High price range
-    'unit',             # Price unit ($/ton, $/cord, $/mbf)
+    'price_avg',        # Average price (original unit)
+    'price_low',        # Low price range (original unit)
+    'price_high',       # High price range (original unit)
+    'unit',             # Original price unit ($/ton, $/cord, $/mbf)
+    'price_per_ton',    # Standardized price in $/ton
+    'conversion_factor', # Factor used to convert to $/ton
     'sample_size',      # Number of reports/samples
     'notes',            # Additional info (log_rule, program, etc.)
 ]
@@ -629,6 +634,49 @@ def main():
         if col not in combined.columns:
             combined[col] = None
 
+    # Apply unit conversions to standardize prices to $/ton
+    console.print("[bold]Standardizing prices to $/ton...[/bold]")
+
+    def get_conversion_factor(row):
+        """Get the conversion factor for a row."""
+        unit = str(row['unit']).lower() if pd.notna(row['unit']) else ''
+        species = str(row['species']) if pd.notna(row['species']) else ''
+
+        if 'ton' in unit:
+            return 1.0
+        elif 'cord' in unit:
+            return get_cord_to_ton_factor(species, row.get('product_type', ''))
+        elif 'mbf' in unit:
+            return get_mbf_to_ton_factor(species, row.get('product_type', ''))
+        elif 'index' in unit:
+            return None  # Cannot convert index to actual price
+        return None
+
+    def convert_price(row, price_col):
+        """Convert a price column to $/ton."""
+        if pd.isna(row[price_col]):
+            return None
+        factor = row['conversion_factor']
+        if factor is None or pd.isna(factor):
+            return None
+        unit = str(row['unit']).lower() if pd.notna(row['unit']) else ''
+        if 'ton' in unit:
+            return row[price_col]
+        elif 'cord' in unit or 'mbf' in unit:
+            return row[price_col] / factor
+        return None
+
+    # Calculate conversion factors
+    combined['conversion_factor'] = combined.apply(get_conversion_factor, axis=1)
+
+    # Calculate standardized price per ton
+    combined['price_per_ton'] = combined.apply(lambda r: convert_price(r, 'price_avg'), axis=1)
+
+    # Count conversions
+    converted_count = combined['price_per_ton'].notna().sum()
+    total_with_price = combined['price_avg'].notna().sum()
+    console.print(f"  Converted {converted_count:,} of {total_with_price:,} records to $/ton")
+
     # Reorder columns
     combined = combined[UNIFIED_COLUMNS]
 
@@ -687,6 +735,22 @@ def main():
     unit_counts = combined['unit'].value_counts()
     for unit, count in unit_counts.items():
         console.print(f"  {unit}: {count:,}")
+
+    # Standardized price summary
+    console.print("\n[bold]Standardized Price Summary ($/ton):[/bold]")
+    price_data = combined[combined['price_per_ton'].notna()]
+    if len(price_data) > 0:
+        console.print(f"  Records with $/ton price: {len(price_data):,}")
+        console.print(f"  Mean: ${price_data['price_per_ton'].mean():.2f}/ton")
+        console.print(f"  Median: ${price_data['price_per_ton'].median():.2f}/ton")
+        console.print(f"  Range: ${price_data['price_per_ton'].min():.2f} - ${price_data['price_per_ton'].max():.2f}/ton")
+
+        # By product type
+        console.print("\n[bold]Mean $/ton by Product Type:[/bold]")
+        product_prices = price_data.groupby('product_type')['price_per_ton'].agg(['mean', 'count'])
+        product_prices = product_prices.sort_values('count', ascending=False).head(10)
+        for product, row in product_prices.iterrows():
+            console.print(f"  {product}: ${row['mean']:.2f}/ton ({int(row['count']):,} records)")
 
     # Year coverage
     console.print(f"\n[bold]Year Coverage:[/bold] {int(combined['year'].min())} - {int(combined['year'].max())}")
