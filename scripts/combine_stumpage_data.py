@@ -668,8 +668,177 @@ def load_usfs_pnw():
     return pd.DataFrame(records)
 
 
+def load_missouri():
+    """Load Missouri MDC data."""
+    path = BASE_PATH / "mo_mdc" / "mo_stumpage_parsed.csv"
+    if not path.exists():
+        return pd.DataFrame()
+
+    df = pd.read_csv(path)
+
+    return pd.DataFrame({
+        'source': 'MO',
+        'year': df['year'],
+        'quarter': df['quarter'],
+        'period_type': 'quarterly',
+        'region': df['region'],
+        'county': None,
+        'species': df['species'],
+        'product_type': df['product_type'].apply(standardize_product_type),
+        'price_avg': df['price_avg'],
+        'price_low': df.get('price_low'),
+        'price_high': df.get('price_high'),
+        'unit': df['unit'].apply(standardize_unit),
+        'sample_size': None,
+        'notes': None
+    })
+
+
+def load_virginia():
+    """Load Virginia Tech data."""
+    path = BASE_PATH / "va_tech" / "va_stumpage_parsed.csv"
+    if not path.exists():
+        return pd.DataFrame()
+
+    df = pd.read_csv(path)
+
+    # Convert Q1, Q2, etc. to integers
+    def parse_quarter(q):
+        if pd.isna(q):
+            return None
+        q_str = str(q).upper()
+        if 'Q1' in q_str:
+            return 1
+        elif 'Q2' in q_str:
+            return 2
+        elif 'Q3' in q_str:
+            return 3
+        elif 'Q4' in q_str:
+            return 4
+        return None
+
+    return pd.DataFrame({
+        'source': 'VA',
+        'year': df['year'],
+        'quarter': df['quarter'].apply(parse_quarter),
+        'period_type': 'quarterly',
+        'region': df['region'],
+        'county': None,
+        'species': df['species'],
+        'product_type': df['product_type'].apply(standardize_product_type),
+        'price_avg': df['price_avg'],
+        'price_low': None,
+        'price_high': None,
+        'unit': df['unit'].apply(standardize_unit),
+        'sample_size': None,
+        'notes': None
+    })
+
+
+def load_ohio():
+    """Load Ohio OSU data."""
+    path = BASE_PATH / "oh_osu" / "oh_stumpage_parsed.csv"
+    if not path.exists():
+        return pd.DataFrame()
+
+    df = pd.read_csv(path)
+
+    # Convert quarter - Ohio uses 'ANNUAL', 'January', 'July'
+    def parse_quarter(q):
+        if pd.isna(q):
+            return None
+        q_str = str(q).upper()
+        if 'ANNUAL' in q_str:
+            return None
+        elif 'JAN' in q_str:
+            return 1
+        elif 'JUL' in q_str:
+            return 3
+        return None
+
+    def get_period_type(q):
+        if pd.isna(q):
+            return 'annual'
+        if 'ANNUAL' in str(q).upper():
+            return 'annual'
+        return 'semi-annual'
+
+    return pd.DataFrame({
+        'source': 'OH',
+        'year': df['year'],
+        'quarter': df['quarter'].apply(parse_quarter),
+        'period_type': df['quarter'].apply(get_period_type),
+        'region': df['region'],
+        'county': None,
+        'species': df['species'],
+        'product_type': df['product_type'].apply(standardize_product_type),
+        'price_avg': df['price_avg'],
+        'price_low': df.get('price_low'),
+        'price_high': df.get('price_high'),
+        'unit': df['unit'].apply(standardize_unit),
+        'sample_size': None,
+        'notes': None
+    })
+
+
+def load_indiana():
+    """Load Indiana Woodland Stewards data."""
+    path = BASE_PATH / "in_woodland" / "in_stumpage_parsed.csv"
+    if not path.exists():
+        return pd.DataFrame()
+
+    df = pd.read_csv(path)
+
+    return pd.DataFrame({
+        'source': 'IN',
+        'year': df['year'],
+        'quarter': None,
+        'period_type': 'annual',
+        'region': df['region'],
+        'county': None,
+        'species': df['species'],
+        'product_type': df['product_type'].apply(standardize_product_type),
+        'price_avg': df['price_avg'],
+        'price_low': None,
+        'price_high': None,
+        'unit': df['unit'].apply(standardize_unit),
+        'sample_size': None,
+        'notes': df.get('quality_grade', None)
+    })
+
+
+def load_kentucky():
+    """Load Kentucky Division of Forestry data.
+
+    Note: Kentucky reports DELIVERED log prices, not stumpage prices.
+    Stumpage is typically 40-60% of delivered price.
+    """
+    path = BASE_PATH / "ky_forestry" / "ky_stumpage_parsed.csv"
+    if not path.exists():
+        return pd.DataFrame()
+
+    df = pd.read_csv(path)
+
+    return pd.DataFrame({
+        'source': 'KY',
+        'year': df['year'],
+        'quarter': df['quarter'],
+        'period_type': 'quarterly',
+        'region': df['region'],
+        'county': None,
+        'species': df['species'],
+        'product_type': df['product_type'].apply(standardize_product_type),
+        'price_avg': df['price_avg'],
+        'price_low': df.get('price_low'),
+        'price_high': df.get('price_high'),
+        'unit': df['unit'].apply(standardize_unit),
+        'sample_size': None,
+        'notes': 'Delivered log price (not stumpage)'
+    })
+
+
 def main():
-    console.print("[bold blue]Combining Stumpage Price Data from 18+ States[/bold blue]\n")
+    console.print("[bold blue]Combining Stumpage Price Data from 21+ States[/bold blue]\n")
 
     # Define all loaders
     loaders = [
@@ -691,6 +860,11 @@ def main():
         ('West Virginia', load_west_virginia),
         ('North Carolina', load_north_carolina),
         ('USFS PNW (OR/WA/MT/ID/CA/AK)', load_usfs_pnw),
+        ('Missouri', load_missouri),
+        ('Virginia', load_virginia),
+        ('Ohio', load_ohio),
+        ('Indiana', load_indiana),
+        ('Kentucky', load_kentucky),
     ]
 
     # Load all data
