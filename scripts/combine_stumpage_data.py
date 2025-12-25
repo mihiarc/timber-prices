@@ -572,8 +572,104 @@ def load_west_virginia():
     })
 
 
+def load_north_carolina():
+    """Load North Carolina data."""
+    path = BASE_PATH / "nc_state" / "nc_stumpage_prices_combined.csv"
+    if not path.exists():
+        return pd.DataFrame()
+
+    df = pd.read_csv(path)
+
+    # Map product names to standardized format
+    def map_product(p):
+        if 'sawtimber' in p:
+            return 'sawtimber'
+        elif 'pulpwood' in p:
+            return 'pulpwood'
+        return p
+
+    def map_species(p):
+        if 'pine' in p:
+            return 'Pine'
+        elif 'hardwood' in p:
+            return 'Hardwood'
+        return 'Mixed'
+
+    return pd.DataFrame({
+        'source': 'NC',
+        'year': df['year'],
+        'quarter': None,
+        'period_type': 'annual',
+        'region': df['region'].apply(lambda x: x.replace('_', ' ').title()),
+        'county': None,
+        'species': df['product'].apply(map_species),
+        'product_type': df['product'].apply(map_product),
+        'price_avg': df['price'],
+        'price_low': None,
+        'price_high': None,
+        'unit': '$/mbf',  # NC prices are in $/MBF
+        'sample_size': None,
+        'notes': None
+    })
+
+
+def load_usfs_pnw():
+    """Load USFS Pacific Northwest data (OR, WA, MT, ID, CA, AK)."""
+    path = BASE_PATH / "usfs_pnw" / "usfs_pnw_stumpage_combined.csv"
+    if not path.exists():
+        return pd.DataFrame()
+
+    df = pd.read_csv(path)
+
+    # Map subregions to state codes
+    def get_state_code(row):
+        subregion = str(row['subregion']).lower()
+        region = str(row['region']).lower()
+
+        if 'montana' in subregion:
+            return 'MT'
+        elif 'idaho' in subregion:
+            return 'ID'
+        elif 'oregon' in subregion:
+            return 'OR'
+        elif 'washington' in subregion:
+            return 'WA'
+        elif 'california' in subregion or 'california' in region:
+            return 'CA'
+        elif 'alaska' in subregion or 'alaska' in region:
+            return 'AK'
+        elif 'montana_idaho' in region:
+            return 'MT_ID'
+        elif 'washington_oregon' in region:
+            return 'OR_WA'
+        return 'PNW'
+
+    # Create a record for each row with state-level attribution
+    records = []
+    for _, row in df.iterrows():
+        state = get_state_code(row)
+        records.append({
+            'source': state,
+            'year': row['year'],
+            'quarter': None,
+            'period_type': 'annual',
+            'region': row['subregion'],
+            'county': None,
+            'species': 'Softwood',  # PNW data is primarily softwood/conifer
+            'product_type': 'sawtimber',
+            'price_avg': row['price_per_mbf'],
+            'price_low': None,
+            'price_high': None,
+            'unit': '$/mbf',
+            'sample_size': None,
+            'notes': f"USFS PNW; Table: {row['table']}"
+        })
+
+    return pd.DataFrame(records)
+
+
 def main():
-    console.print("[bold blue]Combining Stumpage Price Data from 16 States[/bold blue]\n")
+    console.print("[bold blue]Combining Stumpage Price Data from 18+ States[/bold blue]\n")
 
     # Define all loaders
     loaders = [
@@ -593,6 +689,8 @@ def main():
         ('South Carolina', load_south_carolina),
         ('Texas', load_texas),
         ('West Virginia', load_west_virginia),
+        ('North Carolina', load_north_carolina),
+        ('USFS PNW (OR/WA/MT/ID/CA/AK)', load_usfs_pnw),
     ]
 
     # Load all data
